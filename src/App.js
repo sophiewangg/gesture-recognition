@@ -1,11 +1,11 @@
 import styled from 'styled-components';
-import { useState, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import * as tf from '@tensorflow/tfjs';
 import * as handpose from "@tensorflow-models/handpose";
 import * as fp from "fingerpose";
 import ReactWebcam from 'react-webcam'; 
 import './App.css';
-import { drawHand } from './utils/utilities';
+import { drawHand } from './utils/drawHand';
 
 function App() {
   const [detectedGesture, setDetectedGesture] = useState(null);
@@ -27,7 +27,7 @@ function App() {
       //loop to detect hands
       setInterval(() => {
         detect(net);
-      }, 100)
+      }, 10)
   }
 
   //is there a way to have videoHeight/width calculations not in here, so the function is slightly less expensive
@@ -38,8 +38,8 @@ function App() {
       const videoWidth = video.videoWidth;
 
       //make sure video properties are set so that detection works properly lol
-      video.height = videoHeight;
-      video.width = videoWidth;
+      // video.height = videoHeight;
+      // video.width = videoWidth;
 
       canvasRef.current.height = videoHeight;
       canvasRef.current.width = videoWidth;
@@ -61,16 +61,16 @@ function App() {
         const GE = new fp.GestureEstimator([
           fp.Gestures.VictoryGesture,
           fp.Gestures.ThumbsUpGesture
-        ])
+        ]);
 
         const gesture = await GE.estimate(hand[0].landmarks, 8);
-        console.log(gesture);
-
-        if (gesture.gestures && gesture.gestures.length >0){
-          const confidence = gesture.gestures.map((prediction) => prediction.confidence);
-          const maxConfidence = confidence.indexOf(Math.max.apply(null, confidence)); //since Math.max doesn't work on an array -- if multiple gestures are detected, grab gesture of highest confidence
-          setDetectedGesture(gesture.gestures[maxConfidence].name)
-          console.log(detectedGesture);
+        // console.log(gesture);
+        if (gesture.gestures !== undefined && gesture.gestures.length > 0){
+          const confidence = gesture.gestures.map(({score}) => score);
+          const maxConfidence = confidence.indexOf(Math.max(...confidence));
+          setDetectedGesture(gesture.gestures[maxConfidence].name);
+          console.log(gesture.gestures[maxConfidence].name);
+          console.log(`detected gesture: ${detectedGesture}`);
         }
       }
 
@@ -80,24 +80,72 @@ function App() {
     }
   }
 
-  runHandpose();
-  console.log(`rerender`);
+  useEffect(() => {
+    runHandpose();
+  }, [runHandpose]);
+
+  useEffect(()=> {
+    console.log(`detected gesture 2: ${detectedGesture}`); // detectedGesture is null booooo
+    if (detectedGesture === 'victory'){
+      window.scrollBy(0, 1000);
+    }
+
+    if (detectedGesture === 'thumbs_up'){
+      setShowVideo(false);
+      console.log(`video should be off!!`)
+    }
+  }, [detectedGesture])
+
 
   return (
-    <div className="App">
-      <header className="App-header">
+    <AppContainer className="App">
         {
-          showVideo && <Webcam ref={webcamRef}/> 
+          showVideo && (
+            <div>
+              <Webcam ref={webcamRef}/>
+              <Canvas ref={canvasRef}/>
+            </div> 
+           )
         }
-        <button onClick={startVideo}> start </button>
-        <button onClick={stopVideo}> stop </button> 
-        <Canvas ref={canvasRef}/>
-      </header>
-    </div>
+        
+        <WebsiteContainer>
+          <ButtonContainer>
+            <Button onClick={startVideo}> start </Button>
+            <Button onClick={stopVideo}> stop </Button> 
+          </ButtonContainer>
+
+          <ColorDiv> </ColorDiv>
+          <ColorlessDiv> </ColorlessDiv>
+          <ColorDiv> </ColorDiv>
+
+        </WebsiteContainer>
+
+
+      
+    </AppContainer>
   );
 }
 
 export default App;
+
+const AppContainer = styled.div`
+  display: flex;
+  // flex-direction: column;
+`;
+
+const WebsiteContainer = styled.div`
+  width: 100%;
+`
+
+const ColorDiv = styled.div`
+  height: 100vh;
+  background-color: blue;
+`
+
+const ColorlessDiv = styled.div`
+  height: 100vh;
+  background-color: white;
+`
 
 const Webcam = styled(ReactWebcam)`
   position: absolute;
@@ -106,8 +154,8 @@ const Webcam = styled(ReactWebcam)`
   left: 0;
   right: 0;
   text-align: center;
-  z-index: 10;
   width: 640;
+  z-index: 99;
   height: 480;
 `;
 
@@ -118,7 +166,17 @@ position: absolute;
   left: 0;
   right: 0;
   text-align: center;
-  z-index: 10;
   width: 640;
+  z-index: 100;
   height: 480;
 `;
+
+const ButtonContainer = styled.div`
+  display: flex;
+  justify-content: start;
+`
+
+const Button = styled.button`
+  padding: 10px;
+  border-radius: 10px;
+`
